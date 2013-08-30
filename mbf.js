@@ -33,7 +33,9 @@ function combineTwoMidterms(term1, term2){
 function combineMidterms(midterms){
     var ret = new Array();
     var combinedSome = true;
-    while (combinedSome){
+    var aaa = 0;
+    while (combinedSome && aaa < 5){
+	console.log(aaa++, midterms.length);
 	var combined = new Object();
 	var tmp = new Array();
 	combinedSome = false;
@@ -41,6 +43,7 @@ function combineMidterms(midterms){
 	    for (var j = i + 1; j < midterms.length; ++j){
 		var combination = combineTwoMidterms(midterms[i], midterms[j]);
 		if (combination){
+		    //console.log("combined", midterms[i].toString(), midterms[j].toString(), combination.toString());
 		    tmp.push(combination);
 		    combined[i] = combined[j] = true;
 		    combinedSome = true;
@@ -169,19 +172,20 @@ Expression.prototype.getAllMultipliers = function(){
 	    return new Array();
 	}
     }
-    var op1 = this.ops[0];
-    var remainingOps = new Array();
-    for (var i = 2; i < this.ops.length; ++i){
-	remainingOps.push(this.ops[i]);
-    }
-    var ret = new Expression(remainingOps).getAllMultipliers();
-    var retLen = ret.length;
-    for (var i = 0; i < retLen; ++i){
-	var newOp = new Expression(new Array());
-	for (var j in ret[i].ops){
-	    
+    var ret = new Array();
+    for (var i in this.ops){
+	var op = this.ops[i];
+	var otherOps = this.ops.filter(function(value, idx){
+	    return (idx != i && idx != i * 1 + 1);
+	});
+	ret.push(new Expression([op]));
+	if (otherOps.length > 0){
+	    var 
+	    for (var j in new Expression(otherOps)){
+	    }
 	}
     }
+    return ret;
 }*/
 Expression.prototype.addBrackets = function(){
     
@@ -252,11 +256,13 @@ function main(){
 	}
 	solutionDnf = solve(outputs, true);
 	solutionCnf = solve(outputs, false);
+	//solutionCnf = "";
 	output("Выходы: [" + outputs.join(" ") + "], решение: " + solutionDnf.toString() + " или " + solutionCnf.toString());
     } catch (err){
 	output(err);
     }
 }
+//0000100100001001
 //console.log(getInputs(13, 4));
-//console.log(solve([0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1], true).toString());
+//console.log(solve([0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1], true).ops[2].getAllMultipliers());
 //console.log(solve([0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0]))
