@@ -239,7 +239,7 @@ function solve(outputs, useDnf){
 
 function output(text){
     var p = document.createElement("p");
-    p.innerText = text;
+    p.textContent = text;
     document.getElementById("output").appendChild(p);
 }
 
