@@ -18,6 +18,7 @@ function combineTwoMidterms(term1, term2){
     }
     if (diffAt != -1){
 	var ret = new Midterm(term1.idx.concat(term2.idx), []);
+	ret.idx.sort();
 	for (var i = 0; i < term1.inputs.length; ++i){
 	    if (i != diffAt){
 		ret.inputs.push(term1.inputs[i]);
@@ -34,7 +35,7 @@ function combineMidterms(midterms){
     var ret = new Array();
     var combinedSome = true;
     var aaa = 0;
-    while (combinedSome && aaa < 5){
+    while (combinedSome /* && midterms.length*/){
 	console.log(aaa++, midterms.length);
 	var combined = new Object();
 	var tmp = new Array();
@@ -42,8 +43,18 @@ function combineMidterms(midterms){
 	for (var i = 0; i < midterms.length; ++i){
 	    for (var j = i + 1; j < midterms.length; ++j){
 		var combination = combineTwoMidterms(midterms[i], midterms[j]);
-		if (combination){
-		    //console.log("combined", midterms[i].toString(), midterms[j].toString(), combination.toString());
+		if (combination && tmp.filter(function(t){
+		    if (t.idx.length != combination.idx.length){
+			return false;
+		    }
+		    for (var i in t.idx){
+			if (t.idx[i] != combination.idx[i]){
+			    return false;
+			}
+		    }
+		    return true;
+		}).length == 0){
+		    console.log("combined", midterms[i].toString(), midterms[j].toString(), combination.toString());
 		    tmp.push(combination);
 		    combined[i] = combined[j] = true;
 		    combinedSome = true;
@@ -256,7 +267,6 @@ function main(){
 	}
 	solutionDnf = solve(outputs, true);
 	solutionCnf = solve(outputs, false);
-	//solutionCnf = "";
 	output("Выходы: [" + outputs.join(" ") + "], решение: " + solutionDnf.toString() + " или " + solutionCnf.toString());
     } catch (err){
 	output(err);
