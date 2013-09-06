@@ -36,32 +36,35 @@ function combineMidterms(midterms){
     var combinedSome = true;
     var aaa = 0;
     while (combinedSome /* && midterms.length*/){
-	console.log(aaa++, midterms.length);
 	var combined = new Object();
 	var tmp = new Array();
 	combinedSome = false;
 	for (var i = 0; i < midterms.length; ++i){
 	    for (var j = i + 1; j < midterms.length; ++j){
 		var combination = combineTwoMidterms(midterms[i], midterms[j]);
-		if (combination && tmp.filter(function(t){
-		    if (t.idx.length != combination.idx.length){
-			return false;
-		    }
-		    for (var i in t.idx){
-			if (t.idx[i] != combination.idx[i]){
+		if (combination){
+		    console.log("combined", midterms[i].toString(), midterms[j].toString(), ' -> ', combination.toString());
+		    if (tmp.filter(function(t){
+			if (t.idx.length != combination.idx.length){
 			    return false;
 			}
+			for (var i in t.idx){
+			    if (t.idx[i] != combination.idx[i]){
+				return false;
+			    }
+			}
+			return true;
+		    }).length == 0)
+		    {
+			tmp.push(combination);
 		    }
-		    return true;
-		}).length == 0){
-		    console.log("combined", midterms[i].toString(), midterms[j].toString(), combination.toString());
-		    tmp.push(combination);
 		    combined[i] = combined[j] = true;
+		    console.log(i, combined[i], j, combined[j]);
 		    combinedSome = true;
 		}
 	    }
 	}
-	for (var i in midterms){
+	for (var i = 0; i < midterms.length; ++i){
 	    if (!combined[i]){
 		ret.push(midterms[i]);
 	    }
@@ -100,7 +103,6 @@ function purgeOverlapping(midterms){
     }
     var ret = new Array();
     while (!allDone(terms)){
-	console.log(terms);
 	var candidates = new Array();
 	for (var k in terms){
 	    if (!terms[k].done){
@@ -165,18 +167,31 @@ function serialize(midterms, useDnf){
 function Expression(ops){
     this.ops = ops;
 }
-Expression.prototype.toString = function(){
+Expression.prototype.toString = function(topLevel){
     var ret = "";
     for (var e in this.ops){
 	/*if (this.ops[e] != '*')*/{
-	    ret += this.ops[e].toString();
+	    a = this;
+	    if (this.ops[e].toString() != '*'){
+		ret += this.ops[e].toString();
+	    }
 	    ret += " ";
 	}
 	ret = ret.trimRight();
     }
-    return this.ops.length > 2 ? "(" + ret + ")" : ret;
+    var needBrackets = !topLevel && this.ops.length > 2 && this.ops.filter(function(x) {return x == '+'}).length != 0;
+    return needBrackets ? "(" + ret + ")" : ret;
 }
-/*
+Expression.prototype.clone = function(){
+    var newOps = new Array();
+    this.ops.forEach(function(x) {newOps.push(x)});
+    return new Expression(newOps);
+}
+function addIfNeeded(ret, m){
+    if (ret.filter(function(x) {return x == m}).length == 0){
+	ret.push(m);
+    }
+}
 Expression.prototype.getAllMultipliers = function(){
     for (var i in this.ops){
 	if (this.ops[i] == '+'){
@@ -186,20 +201,107 @@ Expression.prototype.getAllMultipliers = function(){
     var ret = new Array();
     for (var i in this.ops){
 	var op = this.ops[i];
+	if (op == '*'){
+	    continue;
+	}
 	var otherOps = this.ops.filter(function(value, idx){
 	    return (idx != i && idx != i * 1 + 1);
 	});
-	ret.push(new Expression([op]));
+	addIfNeeded(ret, new Expression([op]));
 	if (otherOps.length > 0){
-	    var 
-	    for (var j in new Expression(otherOps)){
+	    var otherMultipliers = new Expression(otherOps).getAllMultipliers();
+	    for (var j in otherMultipliers){
+		var multiplier = otherMultipliers[j];
+		addIfNeeded(ret, multiplier);
+		var newExp = multiplier.clone();
+		newExp.ops.push('*');
+		newExp.ops.push(op);
+		addIfNeeded(ret, newExp);
 	    }
+	}
+	break; // process only head
+    }
+    return ret;
+}
+function eq(a1, a2){
+    return a1.length == a2.length && a1.filter(function(v, i){return a2[i] != v}).length == 0;
+}
+function divide(x, y){
+    var ret = new Expression(new Array());
+    for (var i = 0; i < x.ops.length; ++i){
+	if (y.ops.filter(function(op) {return op == x.ops[i]}).length == 0){
+	    ret.ops.push(x.ops[i]);
+	} else{
+	    ++i;
 	}
     }
     return ret;
-}*/
+}
+function addBracketsImpl(exp){
+    var ops = exp.ops;
+    var multipliers = new Array();
+    ops.forEach(function(op){
+	if (op != '+'){
+	    op.getAllMultipliers().forEach(function(m){
+		multipliers.push(m);
+	    });
+	}
+    });
+    multipliers.sort(function(m1, m2){
+	var m1l = multipliers.filter(function(x) {return eq(x.ops, m1.ops)}).length;
+	var m2l = multipliers.filter(function(x) {return eq(x.ops, m2.ops)}).length;
+	return m2l - m1l;
+    });
+    if (multipliers.length > 0 && multipliers.filter(function(x) {return eq(x.ops, multipliers[0].ops)}).length > 1){
+	var best = multipliers[0];
+	var ret = new Expression(new Array().concat(best.ops));
+	ret.ops.push('*');
+	var d = new Expression(new Array());
+	var r = new Expression(new Array());
+	for (var i in ops){
+	    if (ops[i] == '+'){
+		continue;
+	    }
+	    var d1 = divide(ops[i], best);
+	    //console.log(ops[i].toString(), ' / ', best.toString(), ' = ', d1.toString());
+	    if (d1.ops.length == ops[i].ops.length){
+		if (r.ops.length != 0) {r.ops.push('+')};
+		r.ops.push(ops[i]);
+	    } else{
+		if (d.ops.length != 0) {d.ops.push('+')};
+		d.ops.push(d1);
+	    }
+	}
+	if (d.ops.length == 0){
+	    return exp;
+	}
+	ret.ops.push(addBracketsImpl(d));
+	if (r.ops.length > 0){
+	    ret.ops.push('+');
+	    ret.ops.push(addBracketsImpl(r));
+	}
+	console.log(ret.toString());
+	return ret;
+    } else{
+	return exp;
+    }
+}
 Expression.prototype.addBrackets = function(){
-    
+    return addBracketsImpl(this);
+    var newOps = new Array();
+    var tmp = new Array();
+    for (var i = 0; i < this.ops.length; ++i){
+	if (this.ops[i] != '*'){
+	    tmp.push(this.ops[i]);
+	} else{
+	    newOps = newOps.concat(tmp);
+	    newOps.push(this.ops[i]);
+	    newOps.push(this.ops[++i]);
+	    tmp = new Array();
+	}
+    }
+    newOps = newOps.concat(addBracketsImpl(tmp));
+    return new Expression(newOps);
 }
 
 function getExpression(midterms, isDnf){
@@ -257,6 +359,9 @@ function output(text){
     p.textContent = text;
     document.getElementById("output").appendChild(p);
 }
+function clean(){
+    document.getElementById("output").innerHTML = "";
+}
 
 function main(){
     try{
@@ -267,12 +372,17 @@ function main(){
 	}
 	solutionDnf = solve(outputs, true);
 	solutionCnf = solve(outputs, false);
-	output("Выходы: [" + outputs.join(" ") + "], решение: " + solutionDnf.toString() + " или " + solutionCnf.toString());
+	output("Выходы: [" + outputs.join(" ") + "], решение: " + solutionDnf.addBrackets().toString(true) + " или " + solutionCnf.toString());
     } catch (err){
 	output(err);
     }
 }
+//new Expression([10, '*', 20, '*', 30]).getAllMultipliers().forEach(function(x) {console.log(x.toString())})
 //0000100100001001
 //console.log(getInputs(13, 4));
+//console.log(solve([0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1], true));
 //console.log(solve([0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1], true).ops[2].getAllMultipliers());
+//solve([0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1], true).ops[2].getAllMultipliers().forEach(function(x) {console.log(x.toString())})
+console.log(solve([0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1], true).addBrackets().toString(true));
+//console.log(solve([0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1], true).addBrackets().toString());
 //console.log(solve([0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0]))
